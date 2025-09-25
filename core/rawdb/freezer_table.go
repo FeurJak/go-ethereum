@@ -836,6 +836,18 @@ func (t *freezerTable) truncateTail(items uint64) error {
 	return nil
 }
 
+// resetTail overwrites the freezer table's metadata files to set the virtual
+// tail to the given legacy offset.
+func (t *freezerTable) resetTail(legacyOffset uint64) error {
+	// Update the virtual tail without fsync, otherwise it will significantly
+	// impact the overall performance.
+	if err := t.metadata.setVirtualTail(legacyOffset, true); err != nil {
+		return err
+	}
+	t.itemHidden.Store(legacyOffset)
+	return nil
+}
+
 // Close closes all opened files and finalizes the freezer table for use.
 // This operation must be completed before shutdown to prevent the loss of
 // recent writes.

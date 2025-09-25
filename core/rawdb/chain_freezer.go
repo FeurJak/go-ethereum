@@ -306,6 +306,19 @@ func (f *chainFreezer) freeze(db ethdb.KeyValueStore) {
 	}
 }
 
+// resetFreezerMeta resets the tail metadata of the chain freezer.
+func resetFreezerMeta(datadir string, namespace string, legacyOffset uint64) error {
+	if datadir == "" {
+		return nil
+	}
+	freezer, err := NewFreezer(datadir, namespace, false, freezerTableSize, chainFreezerTableConfigs)
+	if err != nil {
+		return err
+	}
+	defer freezer.Close()
+	return freezer.resetTailMeta(legacyOffset)
+}
+
 // tryPruneHistoryBlock try prune ancient data keep blockHistory
 func (f *chainFreezer) tryPruneHistoryBlock(best uint64) {
 	blockHistory := f.blockHistory.Load()

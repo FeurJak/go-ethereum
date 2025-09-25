@@ -227,6 +227,15 @@ func Open(db ethdb.KeyValueStore, opts OpenOptions) (ethdb.Database, error) {
 	if chainFreezerDir != "" {
 		chainFreezerDir = resolveChainFreezerDir(chainFreezerDir)
 	}
+	// Before opening the freezer, check for the legacy pruner's metadata.
+	// If it exists, we need to migrate the freezer's tail to the legacy offset.
+	if legacyOffset := ReadLegacyOffset(db); legacyOffset > 0 {
+		log.Info("Found legacy pruner metadata", "offset", legacyOffset)
+		if err := resetFreezerMeta(chainFreezerDir, opts.MetricsNamespace, legacyOffset); err != nil {
+			return nil, err
+		}
+		CleanLegacyOffset(db)
+	}
 	frdb, err := newChainFreezer(chainFreezerDir, opts.Era, opts.MetricsNamespace, opts.ReadOnly)
 	if err != nil {
 		printChainMetadata(db)
