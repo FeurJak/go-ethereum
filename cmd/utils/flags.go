@@ -1657,10 +1657,9 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 	if ctx.IsSet(AncientFlag.Name) {
 		cfg.DatabaseFreezer = ctx.String(AncientFlag.Name)
 	}
-	if ctx.IsSet(EraFlag.Name) {
-		cfg.DatabaseEra = ctx.String(EraFlag.Name)
+	if ctx.IsSet(PruneAncientDataFlag.Name) {
+		log.Warn(fmt.Sprintf("Option --%s is deprecated. Please using --%s in the future", PruneAncientDataFlag.Name, BlockHistoryFlag.Name))
 	}
-
 	if gcmode := ctx.String(GCModeFlag.Name); gcmode != "full" && gcmode != "archive" {
 		Fatalf("--%s must be either 'full' or 'archive'", GCModeFlag.Name)
 	}
@@ -1694,10 +1693,21 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		log.Warn("The flag --txlookuplimit is deprecated and will be removed, please use --history.transactions")
 		cfg.TransactionHistory = ctx.Uint64(TxLookupLimitFlag.Name)
 	}
+	if ctx.IsSet(BlockHistoryFlag.Name) {
+		cfg.BlockHistory = ctx.Uint64(BlockHistoryFlag.Name)
+		if cfg.BlockHistory != 0 && cfg.BlockHistory < params.FullImmutabilityThreshold {
+			log.Warn("The number of block history is too small, that it will force to", "fullImmutabilityThreshold", params.FullImmutabilityThreshold)
+			cfg.BlockHistory = params.FullImmutabilityThreshold
+		}
+	}
 	if ctx.String(GCModeFlag.Name) == "archive" {
 		if cfg.TransactionHistory != 0 {
 			cfg.TransactionHistory = 0
 			log.Warn("Disabled transaction unindexing for archive node")
+		}
+		if cfg.BlockHistory != 0 {
+			cfg.BlockHistory = 0
+			log.Warn("Disabled partial block reserve for archive node")
 		}
 	}
 	if ctx.IsSet(LogHistoryFlag.Name) {
