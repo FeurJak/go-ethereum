@@ -63,13 +63,15 @@ type chainFreezer struct {
 //     state freezer (e.g. dev mode).
 //   - if non-empty directory is given, initializes the regular file-based
 //     state freezer.
-func newChainFreezer(datadir string, eraDir string, namespace string, readonly bool) (*chainFreezer, error) {
+func newChainFreezer(datadir string, eraDir string, namespace string, readonly bool, blockHistory uint64) (*chainFreezer, error) {
 	if datadir == "" {
-		return &chainFreezer{
+		cf := &chainFreezer{
 			ancients: NewMemoryFreezer(readonly, chainFreezerTableConfigs),
 			quit:     make(chan struct{}),
 			trigger:  make(chan chan struct{}),
-		}, nil
+		}
+		cf.blockHistory.Store(blockHistory)
+		return cf, nil
 	}
 	freezer, err := NewFreezer(datadir, namespace, readonly, freezerTableSize, chainFreezerTableConfigs)
 	if err != nil {
@@ -79,12 +81,14 @@ func newChainFreezer(datadir string, eraDir string, namespace string, readonly b
 	if err != nil {
 		return nil, err
 	}
-	return &chainFreezer{
+	cf := &chainFreezer{
 		ancients: freezer,
 		eradb:    edb,
 		quit:     make(chan struct{}),
 		trigger:  make(chan chan struct{}),
-	}, nil
+	}
+	cf.blockHistory.Store(blockHistory)
+	return cf, nil
 }
 
 // Close closes the chain freezer instance and terminates the background thread.

@@ -1700,6 +1700,10 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 			cfg.BlockHistory = params.FullImmutabilityThreshold
 		}
 	}
+	if cfg.BlockHistory != 0 && cfg.TransactionHistory > cfg.BlockHistory {
+		log.Warn("Transaction history is capped by block history", "provided", cfg.TransactionHistory, "updated", cfg.BlockHistory)
+		cfg.TransactionHistory = cfg.BlockHistory
+	}
 	if ctx.String(GCModeFlag.Name) == "archive" {
 		if cfg.TransactionHistory != 0 {
 			cfg.TransactionHistory = 0
