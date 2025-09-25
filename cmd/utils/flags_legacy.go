@@ -39,15 +39,16 @@ var DeprecatedFlags = []cli.Flag{
 	CacheTrieRejournalFlag,
 	LegacyDiscoveryV5Flag,
 	TxLookupLimitFlag,
+	LightServeFlag,
+	LightIngressFlag,
+	LightEgressFlag,
+	LightMaxPeersFlag,
+	LightNoPruneFlag,
+	LightNoSyncServeFlag,
 	LogBacktraceAtFlag,
 	LogDebugFlag,
 	MinerNewPayloadTimeoutFlag,
-	MinerEtherbaseFlag,
-	MiningEnabledFlag,
-	MetricsEnabledExpensiveFlag,
-	EnablePersonal,
-	UnlockedAccountFlag,
-	InsecureUnlockAllowedFlag,
+	PruneAncientDataFlag,
 }
 
 var (
@@ -132,25 +133,16 @@ var (
 		Usage:    "Enable expensive metrics collection and reporting (deprecated)",
 		Category: flags.DeprecatedCategory,
 	}
-	// Deprecated Oct 2024
 	EnablePersonal = &cli.BoolFlag{
 		Name:     "rpc.enabledeprecatedpersonal",
-		Hidden:   true,
 		Usage:    "This used to enable the 'personal' namespace.",
 		Category: flags.DeprecatedCategory,
 	}
-	UnlockedAccountFlag = &cli.StringFlag{
-		Name:     "unlock",
-		Hidden:   true,
-		Usage:    "Comma separated list of accounts to unlock (deprecated)",
-		Value:    "",
-		Category: flags.DeprecatedCategory,
-	}
-	InsecureUnlockAllowedFlag = &cli.BoolFlag{
-		Name:     "allow-insecure-unlock",
-		Hidden:   true,
-		Usage:    "Allow insecure account unlocking when account-related RPCs are exposed by http (deprecated)",
-		Category: flags.DeprecatedCategory,
+	// Deprecated Dec 2024
+	PruneAncientDataFlag = &cli.BoolFlag{
+		Name:     "pruneancient",
+		Usage:    "Prune ancient data, is an optional config and disabled by default. Only keep the latest 9w blocks' data,the older blocks' data will be permanently pruned. Notice:the geth/chaindata/ancient dir will be removed, if restart without the flag, the ancient data will start with the previous point that the oldest unpruned block number. Recommends to the user who don't care about the ancient data.",
+		Category: flags.BlockHistoryCategory,
 	}
 )
 

@@ -27,6 +27,7 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		NoPrefetch              bool
 		TxLookupLimit           uint64 `toml:",omitempty"`
 		TransactionHistory      uint64 `toml:",omitempty"`
+		BlockHistory            uint64 `toml:",omitempty"`
 		LogHistory              uint64 `toml:",omitempty"`
 		LogNoHistory            bool   `toml:",omitempty"`
 		LogExportCheckpoints    string
@@ -68,6 +69,7 @@ func (c Config) MarshalTOML() (interface{}, error) {
 	enc.NoPrefetch = c.NoPrefetch
 	enc.TxLookupLimit = c.TxLookupLimit
 	enc.TransactionHistory = c.TransactionHistory
+	enc.BlockHistory = c.BlockHistory
 	enc.LogHistory = c.LogHistory
 	enc.LogNoHistory = c.LogNoHistory
 	enc.LogExportCheckpoints = c.LogExportCheckpoints
@@ -113,6 +115,7 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		NoPrefetch              *bool
 		TxLookupLimit           *uint64 `toml:",omitempty"`
 		TransactionHistory      *uint64 `toml:",omitempty"`
+		BlockHistory            *uint64 `toml:",omitempty"`
 		LogHistory              *uint64 `toml:",omitempty"`
 		LogNoHistory            *bool   `toml:",omitempty"`
 		LogExportCheckpoints    *string
@@ -176,6 +179,9 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	}
 	if dec.TransactionHistory != nil {
 		c.TransactionHistory = *dec.TransactionHistory
+	}
+	if dec.BlockHistory != nil {
+		c.BlockHistory = *dec.BlockHistory
 	}
 	if dec.LogHistory != nil {
 		c.LogHistory = *dec.LogHistory

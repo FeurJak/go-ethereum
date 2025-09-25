@@ -54,6 +54,7 @@ var Defaults = Config{
 	NetworkId:          0, // enable auto configuration of networkID == chainID
 	TxLookupLimit:      2350000,
 	TransactionHistory: 2350000,
+	BlockHistory:       0,
 	LogHistory:         2350000,
 	StateHistory:       params.FullImmutabilityThreshold,
 	DatabaseCache:      512,
@@ -100,6 +101,7 @@ type Config struct {
 	TxLookupLimit uint64 `toml:",omitempty"` // The maximum number of blocks from head whose tx indices are reserved.
 
 	TransactionHistory   uint64 `toml:",omitempty"` // The maximum number of blocks from head whose tx indices are reserved.
+	BlockHistory         uint64 `toml:",omitempty"`
 	LogHistory           uint64 `toml:",omitempty"` // The maximum number of blocks from head where a log search index is maintained.
 	LogNoHistory         bool   `toml:",omitempty"` // No log search index is maintained.
 	LogExportCheckpoints string // export log index checkpoints to file

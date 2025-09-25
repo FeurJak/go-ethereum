@@ -276,6 +276,30 @@ var (
 		Value:    ethconfig.Defaults.StateHistory,
 		Category: flags.StateCategory,
 	}
+	LightServeFlag = &cli.IntFlag{
+		Name:   "light.serve",
+		Hidden: true,
+	}
+	LightIngressFlag = &cli.IntFlag{
+		Name:   "light.ingress",
+		Hidden: true,
+	}
+	LightEgressFlag = &cli.IntFlag{
+		Name:   "light.egress",
+		Hidden: true,
+	}
+	LightMaxPeersFlag = &cli.IntFlag{
+		Name:   "light.maxpeers",
+		Hidden: true,
+	}
+	LightNoPruneFlag = &cli.BoolFlag{
+		Name:   "light.nopruning",
+		Hidden: true,
+	}
+	LightNoSyncServeFlag = &cli.BoolFlag{
+		Name:   "light.nosyncserve",
+		Hidden: true,
+	}
 	TransactionHistoryFlag = &cli.Uint64Flag{
 		Name:     "history.transactions",
 		Usage:    "Number of recent blocks to maintain transactions index for (default = about one year, 0 = entire chain)",
@@ -304,6 +328,12 @@ var (
 		Usage:    "Export checkpoints to file in go source file format",
 		Category: flags.StateCategory,
 		Value:    "",
+	}
+	BlockHistoryFlag = &cli.Uint64Flag{
+		Name:     "history.blocks",
+		Usage:    "Number of recent blocks to maintain in DB (default = 0, 0 = entire chain). Pruning is not involving TxIndex/bloomIndex.",
+		Value:    ethconfig.Defaults.BlockHistory,
+		Category: flags.BlockHistoryCategory,
 	}
 	// Beacon client light sync settings
 	BeaconApiFlag = &cli.StringSliceFlag{
@@ -548,6 +578,10 @@ var (
 		Value:    "",
 		Category: flags.AccountCategory,
 	}
+	UnlockedAccountFlag = &cli.StringFlag{
+		Name:   "unlock",
+		Hidden: true,
+	}
 	// EVM settings
 	VMEnableDebugFlag = &cli.BoolFlag{
 		Name:     "vmdebug",
@@ -747,6 +781,10 @@ var (
 		Name:     "rpc.allow-unprotected-txs",
 		Usage:    "Allow for unprotected (non EIP155 signed) transactions to be submitted via RPC",
 		Category: flags.APICategory,
+	}
+	InsecureUnlockAllowedFlag = &cli.BoolFlag{
+		Name:   "allow-insecure-unlock",
+		Hidden: true,
 	}
 	BatchRequestLimit = &cli.IntFlag{
 		Name:     "rpc.batch-request-limit",
