@@ -53,6 +53,13 @@ func ReadLegacyOffset(db ethdb.KeyValueReader) uint64 {
 			maxOffset = offset
 		}
 	}
+	data, _ = db.Get(frozenOfAncientDBKey)
+	if len(data) > 0 {
+		offset := new(big.Int).SetBytes(data).Uint64()
+		if offset > maxOffset {
+			maxOffset = offset
+		}
+	}
 	return maxOffset
 }
 

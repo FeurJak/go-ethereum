@@ -845,7 +845,20 @@ func (t *freezerTable) resetTail(legacyOffset uint64) error {
 		return err
 	}
 	t.itemHidden.Store(legacyOffset)
-	return nil
+
+	// Also update the index file.
+	buffer := make([]byte, indexEntrySize*2)
+	if _, err := t.index.ReadAt(buffer, 0); err != nil {
+		return err
+	}
+	var entry indexEntry
+	entry.unmarshalBinary(buffer)
+
+	entry.offset = uint32(legacyOffset)
+	copy(buffer, entry.append(nil))
+
+	_, err := t.index.WriteAt(buffer[:indexEntrySize], 0)
+	return err
 }
 
 // Close closes all opened files and finalizes the freezer table for use.
