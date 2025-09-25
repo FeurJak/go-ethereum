@@ -314,10 +314,11 @@ type BlockChain struct {
 	currentSafeBlock  atomic.Pointer[types.Header] // Latest (consensus) safe block
 	historyPrunePoint atomic.Pointer[history.PrunePoint]
 
-	bodyCache     *lru.Cache[common.Hash, *types.Body]
-	bodyRLPCache  *lru.Cache[common.Hash, rlp.RawValue]
-	receiptsCache *lru.Cache[common.Hash, []*types.Receipt] // Receipts cache with all fields derived
-	blockCache    *lru.Cache[common.Hash, *types.Block]
+	bodyCache       *lru.Cache[common.Hash, *types.Body]
+	bodyRLPCache    *lru.Cache[common.Hash, rlp.RawValue]
+	receiptsCache   *lru.Cache[common.Hash, []*types.Receipt] // Receipts cache with all fields derived
+	blockCache      *lru.Cache[common.Hash, *types.Block]
+	blockStatsCache *lru.Cache[common.Hash, *BlockStats]
 
 	txLookupLock  sync.RWMutex
 	txLookupCache *lru.Cache[common.Hash, txLookup]
@@ -332,6 +333,16 @@ type BlockChain struct {
 	logger     *tracing.Hooks
 
 	lastForkReadyAlert time.Time // Last time there was a fork readiness print out
+}
+
+// BlockStats contains the summary of a block.
+type BlockStats struct {
+	Uncles     int       // The number of uncles in the block
+	Txs        int       // The number of transactions in the block
+	GasUsed    uint64    // The total gas used in the block
+	BaseFee    *big.Int  // The base fee of the block
+	GasLimit   uint64    // The gas limit of the block	Size       common.StorageSize // The size of the block
+	ReceivedAt time.Time // The timestamp when the block is received
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -366,19 +377,20 @@ func NewBlockChain(db ethdb.Database, genesis *Genesis, engine consensus.Engine,
 	log.Info("")
 
 	bc := &BlockChain{
-		chainConfig:   chainConfig,
-		cfg:           cfg,
-		db:            db,
-		triedb:        triedb,
-		triegc:        prque.New[int64, common.Hash](nil),
-		chainmu:       syncx.NewClosableMutex(),
-		bodyCache:     lru.NewCache[common.Hash, *types.Body](bodyCacheLimit),
-		bodyRLPCache:  lru.NewCache[common.Hash, rlp.RawValue](bodyCacheLimit),
-		receiptsCache: lru.NewCache[common.Hash, []*types.Receipt](receiptsCacheLimit),
-		blockCache:    lru.NewCache[common.Hash, *types.Block](blockCacheLimit),
-		txLookupCache: lru.NewCache[common.Hash, txLookup](txLookupCacheLimit),
-		engine:        engine,
-		logger:        cfg.VmConfig.Tracer,
+		chainConfig:     chainConfig,
+		cfg:             cfg,
+		db:              db,
+		triedb:          triedb,
+		triegc:          prque.New[int64, common.Hash](nil),
+		chainmu:         syncx.NewClosableMutex(),
+		bodyCache:       lru.NewCache[common.Hash, *types.Body](bodyCacheLimit),
+		bodyRLPCache:    lru.NewCache[common.Hash, rlp.RawValue](bodyCacheLimit),
+		receiptsCache:   lru.NewCache[common.Hash, []*types.Receipt](receiptsCacheLimit),
+		blockCache:      lru.NewCache[common.Hash, *types.Block](blockCacheLimit),
+		blockStatsCache: lru.NewCache[common.Hash, *BlockStats](blockCacheLimit),
+		txLookupCache:   lru.NewCache[common.Hash, txLookup](txLookupCacheLimit),
+		engine:          engine,
+		logger:          cfg.VmConfig.Tracer,
 	}
 	bc.hc, err = NewHeaderChain(db, chainConfig, engine, bc.insertStopped)
 	if err != nil {
@@ -2785,6 +2797,43 @@ func (bc *BlockChain) SetTrieFlushInterval(interval time.Duration) {
 }
 
 // GetTrieFlushInterval gets the in-memory tries flushAlloc interval
+func (bc *BlockChain) GetBlockStats(hash common.Hash) *BlockStats {
+	if v, ok := bc.blockStatsCache.Get(hash); ok {
+		return v
+	}
+	n := &BlockStats{}
+	bc.blockStatsCache.Add(hash, n)
+	return n
+}
+
 func (bc *BlockChain) GetTrieFlushInterval() time.Duration {
 	return time.Duration(bc.flushInterval.Load())
+}
+
+// PruneBlockHistory prune block history
+func (bc *BlockChain) PruneBlockHistory(blockHistory uint64) error {
+	// if the node try to keep entire chain blocks, just skip
+	// Notice, it will not recover the pruned block history.
+	if blockHistory == 0 {
+		return nil
+	}
+	bestHeight := bc.CurrentHeader().Number.Uint64()
+	if bestHeight <= blockHistory {
+		log.Info("Prune skip, there is nothing to prune", "tail", 0, "best", bestHeight, "history", blockHistory)
+		return nil
+	}
+	pruneHeight := bestHeight - blockHistory
+	ancientHead, err := bc.db.Ancients()
+	if err != nil {
+		return err
+	}
+	if pruneHeight > ancientHead {
+		pruneHeight = ancientHead
+	}
+	old, err := bc.db.TruncateTail(pruneHeight)
+	if err != nil {
+		return err
+	}
+	log.Info("Prune block history successful", "oldtail", old, "tail", pruneHeight, "best", bestHeight, "history", blockHistory)
+	return nil
 }

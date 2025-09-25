@@ -183,7 +183,7 @@ func (f *Freezer) AncientDatadir() (string, error) {
 // Ancient retrieves an ancient binary blob from the append-only immutable files.
 func (f *Freezer) Ancient(kind string, number uint64) ([]byte, error) {
 	if table := f.tables[kind]; table != nil {
-		return table.Retrieve(number)
+		return table.Retrieve(number - f.tail.Load())
 	}
 	return nil, errUnknownTable
 }
@@ -196,7 +196,7 @@ func (f *Freezer) Ancient(kind string, number uint64) ([]byte, error) {
 //   - if maxBytes is not specified, 'count' items will be returned if they are present.
 func (f *Freezer) AncientRange(kind string, start, count, maxBytes uint64) ([][]byte, error) {
 	if table := f.tables[kind]; table != nil {
-		return table.RetrieveItems(start, count, maxBytes)
+		return table.RetrieveItems(start-f.tail.Load(), count, maxBytes)
 	}
 	return nil, errUnknownTable
 }
