@@ -29,7 +29,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/state/pruner"
 	"github.com/ethereum/go-ethereum/core/state/snapshot"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -45,26 +44,6 @@ var (
 		Usage:       "A set of commands based on the snapshot",
 		Description: "",
 		Subcommands: []*cli.Command{
-			{
-				Name:      "prune-state",
-				Usage:     "Prune stale ethereum state data based on the snapshot",
-				ArgsUsage: "<root>",
-				Action:    pruneState,
-				Flags: slices.Concat([]cli.Flag{
-					utils.BloomFilterSizeFlag,
-				}, utils.NetworkFlags, utils.DatabaseFlags),
-				Description: `
-geth snapshot prune-state <state-root>
-will prune historical state data with the help of the state snapshot.
-All trie nodes and contract codes that do not belong to the specified
-version state will be deleted from the database. After pruning, only
-two version states are available: genesis and the specific one.
-
-The default pruning target is the HEAD-127 state.
-
-WARNING: it's only supported in hash mode(--state.scheme=hash)".
-`,
-			},
 			{
 				Name:      "verify-state",
 				Usage:     "Recalculate state hash based on the snapshot for verification",
@@ -167,44 +146,6 @@ the expected order for the overlay tree migration.
 
 // Deprecation: this command should be deprecated once the hash-based
 // scheme is deprecated.
-func pruneState(ctx *cli.Context) error {
-	stack, _ := makeConfigNode(ctx)
-	defer stack.Close()
-
-	chaindb := utils.MakeChainDatabase(ctx, stack, false)
-	defer chaindb.Close()
-
-	if rawdb.ReadStateScheme(chaindb) != rawdb.HashScheme {
-		log.Crit("Offline pruning is not required for path scheme")
-	}
-	prunerconfig := pruner.Config{
-		Datadir:   stack.ResolvePath(""),
-		BloomSize: ctx.Uint64(utils.BloomFilterSizeFlag.Name),
-	}
-	pruner, err := pruner.NewPruner(chaindb, prunerconfig)
-	if err != nil {
-		log.Error("Failed to open snapshot tree", "err", err)
-		return err
-	}
-	if ctx.NArg() > 1 {
-		log.Error("Too many arguments given")
-		return errors.New("too many arguments")
-	}
-	var targetRoot common.Hash
-	if ctx.NArg() == 1 {
-		targetRoot, err = parseRoot(ctx.Args().First())
-		if err != nil {
-			log.Error("Failed to resolve state root", "err", err)
-			return err
-		}
-	}
-	if err = pruner.Prune(targetRoot); err != nil {
-		log.Error("Failed to prune state", "err", err)
-		return err
-	}
-	return nil
-}
-
 func verifyState(ctx *cli.Context) error {
 	stack, _ := makeConfigNode(ctx)
 	defer stack.Close()
