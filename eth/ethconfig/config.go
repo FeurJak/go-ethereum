@@ -89,6 +89,12 @@ type Config struct {
 	// HistoryMode configures chain history retention.
 	HistoryMode history.HistoryMode
 
+	PruneTables []string
+
+	CutoffGenesis common.Hash
+	CutoffBlock   uint64
+	CutoffHash    common.Hash
+
 	// This can be set to list of enrtree:// URLs which will be queried for
 	// nodes to connect to.
 	EthDiscoveryURLs  []string

@@ -32,6 +32,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/console/prompt"
+	"github.com/ethereum/go-ethereum/core/history"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state/snapshot"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -323,8 +324,13 @@ func inspect(ctx *cli.Context) error {
 			start = d
 		}
 	}
-	stack, _ := makeConfigNode(ctx)
+	stack, cfg := makeConfigNode(ctx)
 	defer stack.Close()
+
+	if err := rawdb.SetPrunableTableConfigs(cfg.Eth.PruneTables...); err != nil {
+		return err
+	}
+	history.SetPrunePoint(cfg.Eth.CutoffGenesis, cfg.Eth.CutoffBlock, cfg.Eth.CutoffHash)
 
 	db := utils.MakeChainDatabase(ctx, stack, true)
 	defer db.Close()

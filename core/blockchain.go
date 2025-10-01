@@ -174,6 +174,7 @@ type BlockChainConfig struct {
 	// Number of blocks from the chain head for which state histories are retained.
 	// If set to 0, all state histories across the entire chain will be retained;
 	StateHistory uint64
+	BlockHistory uint64
 
 	// State snapshot related options
 	SnapshotLimit   int  // Memory allowance (MB) to use for caching snapshot entries in memory
@@ -718,7 +719,7 @@ func (bc *BlockChain) initializeHistoryPruning(latest uint64) error {
 		if predefinedPoint == nil {
 			log.Error("Chain history pruning is not supported for this network", "genesis", bc.genesisBlock.Hash())
 			return errors.New("history pruning requested for unknown network")
-		} else if freezerTail > 0 && freezerTail != predefinedPoint.BlockNumber {
+		} else if freezerTail > 0 && bc.cfg.BlockHistory == 0 && freezerTail != predefinedPoint.BlockNumber {
 			log.Error("Chain history database is pruned to unknown block", "tail", freezerTail)
 			return errors.New("unexpected database tail")
 		}
@@ -2847,4 +2848,19 @@ func (bc *BlockChain) PruneBlockHistory(blockHistory uint64) error {
 	}
 	log.Info("Prune block history successful", "oldtail", old, "tail", pruneHeight, "best", bestHeight, "history", blockHistory)
 	return nil
+}
+
+func (bc *BlockChain) HistoryBlockTail() uint64 {
+	cutoff, _ := bc.HistoryPruningCutoff()
+	if bc.cfg.BlockHistory == 0 {
+		tail, _ := bc.db.Tail()
+		return max(cutoff, tail)
+	}
+
+	if latest := bc.CurrentBlock(); latest != nil && latest.Number.Uint64() > bc.cfg.BlockHistory {
+		return max(latest.Number.Uint64()-bc.cfg.BlockHistory, cutoff)
+	}
+
+	tail, _ := bc.db.Tail()
+	return max(cutoff, tail)
 }

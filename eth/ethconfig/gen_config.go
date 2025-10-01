@@ -21,6 +21,10 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		NetworkId               uint64
 		SyncMode                SyncMode
 		HistoryMode             history.HistoryMode
+		PruneTables             []string
+		CutoffGenesis           common.Hash
+		CutoffBlock             uint64
+		CutoffHash              common.Hash
 		EthDiscoveryURLs        []string
 		SnapDiscoveryURLs       []string
 		NoPruning               bool
@@ -68,6 +72,10 @@ func (c Config) MarshalTOML() (interface{}, error) {
 	enc.NetworkId = c.NetworkId
 	enc.SyncMode = c.SyncMode
 	enc.HistoryMode = c.HistoryMode
+	enc.PruneTables = c.PruneTables
+	enc.CutoffGenesis = c.CutoffGenesis
+	enc.CutoffBlock = c.CutoffBlock
+	enc.CutoffHash = c.CutoffHash
 	enc.EthDiscoveryURLs = c.EthDiscoveryURLs
 	enc.SnapDiscoveryURLs = c.SnapDiscoveryURLs
 	enc.NoPruning = c.NoPruning
@@ -119,6 +127,10 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		NetworkId               *uint64
 		SyncMode                *SyncMode
 		HistoryMode             *history.HistoryMode
+		PruneTables             []string
+		CutoffGenesis           *common.Hash
+		CutoffBlock             *uint64
+		CutoffHash              *common.Hash
 		EthDiscoveryURLs        []string
 		SnapDiscoveryURLs       []string
 		NoPruning               *bool
@@ -176,6 +188,15 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	}
 	if dec.HistoryMode != nil {
 		c.HistoryMode = *dec.HistoryMode
+	}
+	if dec.PruneTables != nil {
+		c.PruneTables = dec.PruneTables
+	}
+	if dec.CutoffGenesis != nil {
+		c.CutoffGenesis = *dec.CutoffGenesis
+	}
+	if dec.CutoffBlock != nil {
+		c.CutoffBlock = *dec.CutoffBlock
 	}
 	if dec.EthDiscoveryURLs != nil {
 		c.EthDiscoveryURLs = dec.EthDiscoveryURLs

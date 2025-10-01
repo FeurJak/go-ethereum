@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -96,3 +97,13 @@ type PrunedHistoryError struct{}
 
 func (e *PrunedHistoryError) Error() string  { return "pruned history unavailable" }
 func (e *PrunedHistoryError) ErrorCode() int { return 4444 }
+
+func SetPrunePoint(genesis common.Hash, number uint64, hash common.Hash) {
+	if genesis != (common.Hash{}) && number != 0 && hash != (common.Hash{}) {
+		PrunePoints[genesis] = &PrunePoint{
+			BlockNumber: number,
+			BlockHash:   hash,
+		}
+		log.Warn("Custom history prune point", "genesis", genesis, "number", number, "hash", hash)
+	}
+}
