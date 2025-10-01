@@ -297,6 +297,12 @@ var (
 		Value:    ethconfig.Defaults.TransactionHistory,
 		Category: flags.StateCategory,
 	}
+	BlockHistoryFlag = &cli.Uint64Flag{
+		Name:     "history.blocks",
+		Usage:    "Number of recent blocks to maintain in DB (default = 0, 0 = entire chain). Pruning is not involving TxIndex/bloomIndex.",
+		Value:    ethconfig.Defaults.BlockHistory,
+		Category: flags.BlockHistoryCategory,
+	}
 	ChainHistoryFlag = &cli.StringFlag{
 		Name:     "history.chain",
 		Usage:    `Blockchain history retention ("all" or "postmerge")`,
@@ -1687,10 +1693,25 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		log.Warn("The flag --txlookuplimit is deprecated and will be removed, please use --history.transactions")
 		cfg.TransactionHistory = ctx.Uint64(TxLookupLimitFlag.Name)
 	}
+	if ctx.IsSet(BlockHistoryFlag.Name) {
+		cfg.BlockHistory = ctx.Uint64(BlockHistoryFlag.Name)
+		if cfg.BlockHistory != 0 && cfg.BlockHistory < params.FullImmutabilityThreshold {
+			log.Warn("The number of block history is too small, that it will force to", "fullImmutabilityThreshold", params.FullImmutabilityThreshold)
+			cfg.BlockHistory = params.FullImmutabilityThreshold
+		}
+	}
+	if cfg.BlockHistory != 0 && cfg.TransactionHistory > cfg.BlockHistory {
+		log.Warn("Transaction history is capped by block history", "provided", cfg.TransactionHistory, "updated", cfg.BlockHistory)
+		cfg.TransactionHistory = cfg.BlockHistory
+	}
 	if ctx.String(GCModeFlag.Name) == "archive" {
 		if cfg.TransactionHistory != 0 {
 			cfg.TransactionHistory = 0
 			log.Warn("Disabled transaction unindexing for archive node")
+		}
+		if cfg.BlockHistory != 0 {
+			cfg.BlockHistory = 0
+			log.Warn("Disabled partial block reserve for archive node")
 		}
 	}
 	if ctx.IsSet(LogHistoryFlag.Name) {

@@ -2820,3 +2820,31 @@ func (bc *BlockChain) GetTrieFlushInterval() time.Duration {
 func (bc *BlockChain) StateSizer() *state.SizeTracker {
 	return bc.stateSizer
 }
+
+// PruneBlockHistory prune block history
+func (bc *BlockChain) PruneBlockHistory(blockHistory uint64) error {
+	// if the node try to keep entire chain blocks, just skip
+	// Notice, it will not recover the pruned block history.
+	if blockHistory == 0 {
+		return nil
+	}
+	bestHeight := bc.CurrentHeader().Number.Uint64()
+	if bestHeight <= blockHistory {
+		log.Info("Prune skip, there is nothing to prune", "tail", 0, "best", bestHeight, "history", blockHistory)
+		return nil
+	}
+	pruneHeight := bestHeight - blockHistory
+	ancientHead, err := bc.db.Ancients()
+	if err != nil {
+		return err
+	}
+	if pruneHeight > ancientHead {
+		pruneHeight = ancientHead
+	}
+	old, err := bc.db.TruncateTail(pruneHeight)
+	if err != nil {
+		return err
+	}
+	log.Info("Prune block history successful", "oldtail", old, "tail", pruneHeight, "best", bestHeight, "history", blockHistory)
+	return nil
+}

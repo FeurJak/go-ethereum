@@ -973,6 +973,7 @@ func (t *freezerTable) Retrieve(item uint64) ([]byte, error) {
 // 'maxBytes' argument. However, if the 'maxBytes' is smaller than the size of one
 // item, it _will_ return one element and possibly overflow the maxBytes.
 func (t *freezerTable) RetrieveItems(start, count, maxBytes uint64) ([][]byte, error) {
+
 	// First we read the 'raw' data, which might be compressed.
 	diskData, sizes, err := t.retrieveItems(start, count, maxBytes)
 	if err != nil {
@@ -1014,6 +1015,7 @@ func (t *freezerTable) RetrieveItems(start, count, maxBytes uint64) ([][]byte, e
 // data if maxBytes is 0. It returns the (potentially compressed) data, and
 // the sizes.
 func (t *freezerTable) retrieveItems(start, count, maxBytes uint64) ([]byte, []int, error) {
+
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -1062,7 +1064,6 @@ func (t *freezerTable) retrieveItems(start, count, maxBytes uint64) ([]byte, []i
 		readStart  = indices[0].offset // Where, in the file, to start reading
 		unreadSize = 0                 // The size of the as-yet-unread data
 	)
-
 	for i, firstIndex := range indices[:len(indices)-1] {
 		secondIndex := indices[i+1]
 		// Determine the size of the item.
@@ -1234,4 +1235,29 @@ func (t *freezerTable) dumpIndex(w io.Writer, start, stop int64) {
 		}
 	}
 	fmt.Fprintf(w, "|--------------------------|\n")
+}
+
+// resetTail overwrites the freezer table's metadata files to set the virtual
+// tail to the given legacy offset.
+func (t *freezerTable) resetTail(legacyOffset uint64) error {
+	// Update the virtual tail without fsync, otherwise it will significantly
+	// impact the overall performance.
+	if err := t.metadata.setVirtualTail(legacyOffset, true); err != nil {
+		return err
+	}
+	t.itemHidden.Store(legacyOffset)
+
+	// Also update the index file.
+	buffer := make([]byte, indexEntrySize*2)
+	if _, err := t.index.ReadAt(buffer, 0); err != nil {
+		return err
+	}
+	var entry indexEntry
+	entry.unmarshalBinary(buffer)
+
+	entry.offset = uint32(legacyOffset)
+	copy(buffer, entry.append(nil))
+
+	_, err := t.index.WriteAt(buffer[:indexEntrySize], 0)
+	return err
 }

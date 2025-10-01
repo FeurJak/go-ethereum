@@ -124,6 +124,7 @@ type Ethereum struct {
 	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
 
 	shutdownTracker *shutdowncheck.ShutdownTracker // Tracks if and when the node has shutdown ungracefully
+
 }
 
 // New creates a new Ethereum object (including the initialisation of the common Ethereum object),
@@ -157,6 +158,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		AncientsDirectory: config.DatabaseFreezer,
 		EraDirectory:      config.DatabaseEra,
 		MetricsNamespace:  "eth/db/chaindata/",
+		BlockHistory:      config.BlockHistory,
 	}
 	chainDb, err := stack.OpenDatabaseWithOptions("chaindata", dbOptions)
 	if err != nil {
