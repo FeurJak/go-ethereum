@@ -2829,6 +2829,11 @@ func (bc *BlockChain) HistoryBlockTail() uint64 {
 		return max(cutoff, tail)
 	}
 
+	// We calculate block history from the latest block (instead of finalized block)
+	// even though pruning is based on finalized block. This is done because pruning
+	// runs in a separate goroutine and we cannot guarantee that the result will be
+	// valid at the time of the block number request. By returning a later block,
+	// we ensure its existence and avoid edge cases.
 	if latest := bc.CurrentBlock(); latest != nil && latest.Number.Uint64() > bc.cfg.BlockHistory {
 		return max(latest.Number.Uint64()-bc.cfg.BlockHistory, cutoff)
 	}
