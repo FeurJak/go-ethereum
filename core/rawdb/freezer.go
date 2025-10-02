@@ -408,21 +408,3 @@ func (f *Freezer) repair() error {
 	f.tail.Store(prunedTail)
 	return nil
 }
-
-func (f *Freezer) resetTailMeta(legacyOffset uint64) error {
-	if f.readonly {
-		return errReadOnly
-	}
-	f.writeLock.Lock()
-	defer f.writeLock.Unlock()
-
-	for _, table := range f.tables {
-		if table.config.prunable {
-			if err := table.resetTail(legacyOffset); err != nil {
-				return err
-			}
-		}
-	}
-	f.tail.Store(legacyOffset)
-	return nil
-}

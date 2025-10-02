@@ -300,7 +300,7 @@ func (f *chainFreezer) freeze(db ethdb.KeyValueStore) {
 		}
 		log.Debug("Deep froze chain segment", context...)
 
-		f.tryPruneHistoryBlock(f.readHeadNumber(db))
+		f.tryPruneHistoryBlock(f.readFinalizedNumber(db))
 
 		// Avoid database thrashing with tiny writes
 		if frozen-first < freezerBatchLimit {
@@ -449,17 +449,4 @@ func (f *chainFreezer) tryPruneHistoryBlock(best uint64) {
 		return
 	}
 	log.Debug("Prune block history successful", "oldtail", old, "tail", expectTail, "best", best, "history", blockHistory)
-}
-
-// resetFreezerMeta resets the tail metadata of the chain freezer.
-func resetFreezerMeta(datadir string, namespace string, legacyOffset uint64) error {
-	if datadir == "" {
-		return nil
-	}
-	freezer, err := NewFreezer(datadir, namespace, false, freezerTableSize, chainFreezerTableConfigs)
-	if err != nil {
-		return err
-	}
-	defer freezer.Close()
-	return freezer.resetTailMeta(legacyOffset)
 }

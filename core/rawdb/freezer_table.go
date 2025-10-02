@@ -1236,28 +1236,3 @@ func (t *freezerTable) dumpIndex(w io.Writer, start, stop int64) {
 	}
 	fmt.Fprintf(w, "|--------------------------|\n")
 }
-
-// resetTail overwrites the freezer table's metadata files to set the virtual
-// tail to the given legacy offset.
-func (t *freezerTable) resetTail(legacyOffset uint64) error {
-	// Update the virtual tail without fsync, otherwise it will significantly
-	// impact the overall performance.
-	if err := t.metadata.setVirtualTail(legacyOffset, true); err != nil {
-		return err
-	}
-	t.itemHidden.Store(legacyOffset)
-
-	// Also update the index file.
-	buffer := make([]byte, indexEntrySize*2)
-	if _, err := t.index.ReadAt(buffer, 0); err != nil {
-		return err
-	}
-	var entry indexEntry
-	entry.unmarshalBinary(buffer)
-
-	entry.offset = uint32(legacyOffset)
-	copy(buffer, entry.append(nil))
-
-	_, err := t.index.WriteAt(buffer[:indexEntrySize], 0)
-	return err
-}
