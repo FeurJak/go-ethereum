@@ -1730,6 +1730,7 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 
 	if ctx.IsSet(BlockHistoryFlag.Name) {
 		cfg.BlockHistory = ctx.Uint64(BlockHistoryFlag.Name)
+		log.Info("Block history is set", "value", cfg.BlockHistory)
 		if cfg.BlockHistory != 0 && cfg.BlockHistory < params.FullImmutabilityThreshold {
 			log.Warn("The number of block history is too small, that it will force to", "fullImmutabilityThreshold", params.FullImmutabilityThreshold)
 			cfg.BlockHistory = params.FullImmutabilityThreshold
@@ -2206,6 +2207,7 @@ func MakeChainDatabase(ctx *cli.Context, stack *node.Node, readonly bool) ethdb.
 			AncientsDirectory: ctx.String(AncientFlag.Name),
 			MetricsNamespace:  "eth/db/chaindata/",
 			EraDirectory:      ctx.String(EraFlag.Name),
+			BlockHistory:      ctx.Uint64(BlockHistoryFlag.Name),
 		}
 		chainDb, err = stack.OpenDatabaseWithOptions("chaindata", options)
 	}

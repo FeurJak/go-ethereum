@@ -39,12 +39,13 @@ type DatabaseOptions struct {
 	Cache            int    // the capacity(in megabytes) of the data caching
 	Handles          int    // number of files to be open simultaneously
 	ReadOnly         bool   // if true, no writes can be performed
+
+	BlockHistory uint64
 }
 
 type internalOpenOptions struct {
-	directory    string
-	dbEngine     string // "leveldb" | "pebble"
-	BlockHistory uint64
+	directory string
+	dbEngine  string // "leveldb" | "pebble"
 	DatabaseOptions
 }
 

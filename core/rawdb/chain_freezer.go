@@ -81,12 +81,14 @@ func newChainFreezer(datadir string, eraDir string, namespace string, readonly b
 	if err != nil {
 		return nil, err
 	}
-	return &chainFreezer{
+	cf := &chainFreezer{
 		ancients: freezer,
 		eradb:    edb,
 		quit:     make(chan struct{}),
 		trigger:  make(chan chan struct{}),
-	}, nil
+	}
+	cf.blockHistory.Store(blockHistory)
+	return cf, nil
 }
 
 // Close closes the chain freezer instance and terminates the background thread.
@@ -129,7 +131,7 @@ func (f *chainFreezer) readFinalizedNumber(db ethdb.KeyValueReader) uint64 {
 	}
 	number, ok := ReadHeaderNumber(db, hash)
 	if !ok {
-		log.Error("Number of finalized block is missing")
+		log.Error("Number of finalized block is missing", "hash", hash)
 		return 0
 	}
 	return number
@@ -430,6 +432,7 @@ func (f *chainFreezer) SyncAncient() error {
 func (f *chainFreezer) tryPruneHistoryBlock(best uint64) {
 	blockHistory := f.blockHistory.Load()
 	if blockHistory == 0 || best <= blockHistory {
+		log.Warn("unable to proceed with pruning", "best", best, "blockHistory", blockHistory)
 		return
 	}
 
