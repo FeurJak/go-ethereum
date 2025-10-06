@@ -17,6 +17,7 @@
 package rawdb
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -102,4 +103,25 @@ func NewStateFreezer(ancientDir string, verkle bool, readOnly bool) (ethdb.Reset
 		name = filepath.Join(ancientDir, MerkleStateFreezerName)
 	}
 	return newResettableFreezer(name, "eth/db/state", readOnly, stateHistoryTableSize, stateFreezerTableConfigs)
+}
+
+func SetPrunableTableConfigs(chainFreezerTableNames ...string) error {
+	updates := make(map[string]freezerTableConfig, len(chainFreezerTableNames))
+	for _, chainFreezerTableName := range chainFreezerTableNames {
+		tableConfig, ok := chainFreezerTableConfigs[chainFreezerTableName]
+		if !ok {
+			return fmt.Errorf("chainFreezerTableConfig not found by %s name", chainFreezerTableName)
+		}
+
+		updates[chainFreezerTableName] = freezerTableConfig{
+			noSnappy: tableConfig.noSnappy,
+			prunable: true,
+		}
+	}
+
+	for name, tableConfig := range updates {
+		chainFreezerTableConfigs[name] = tableConfig
+	}
+
+	return nil
 }

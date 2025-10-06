@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -49,9 +50,10 @@ type chainFreezer struct {
 	// Optional Era database used as a backup for the pruned chain.
 	eradb *eradb.Store
 
-	quit    chan struct{}
-	wg      sync.WaitGroup
-	trigger chan chan struct{} // Manual blocking freeze trigger, test determinism
+	quit         chan struct{}
+	wg           sync.WaitGroup
+	trigger      chan chan struct{} // Manual blocking freeze trigger, test determinism
+	blockHistory atomic.Uint64
 }
 
 // newChainFreezer initializes the freezer for ancient chain segment.
@@ -60,13 +62,15 @@ type chainFreezer struct {
 //     state freezer (e.g. dev mode).
 //   - if non-empty directory is given, initializes the regular file-based
 //     state freezer.
-func newChainFreezer(datadir string, eraDir string, namespace string, readonly bool) (*chainFreezer, error) {
+func newChainFreezer(datadir string, eraDir string, namespace string, readonly bool, blockHistory uint64) (*chainFreezer, error) {
 	if datadir == "" {
-		return &chainFreezer{
+		cf := &chainFreezer{
 			ancients: NewMemoryFreezer(readonly, chainFreezerTableConfigs),
 			quit:     make(chan struct{}),
 			trigger:  make(chan chan struct{}),
-		}, nil
+		}
+		cf.blockHistory.Store(blockHistory)
+		return cf, nil
 	}
 	freezer, err := NewFreezer(datadir, namespace, readonly, freezerTableSize, chainFreezerTableConfigs)
 	if err != nil {
@@ -294,6 +298,7 @@ func (f *chainFreezer) freeze(db ethdb.KeyValueStore) {
 			context = append(context, []interface{}{"hash", ancients[n-1]}...)
 		}
 		log.Debug("Deep froze chain segment", context...)
+		f.tryPruneHistoryBlock(f.readFinalizedNumber(db))
 
 		// Avoid database thrashing with tiny writes
 		if frozen-first < freezerBatchLimit {
@@ -417,4 +422,29 @@ func (f *chainFreezer) TruncateTail(items uint64) (uint64, error) {
 
 func (f *chainFreezer) SyncAncient() error {
 	return f.ancients.SyncAncient()
+}
+
+// tryPruneHistoryBlock try prune ancient data keep blockHistory
+func (f *chainFreezer) tryPruneHistoryBlock(best uint64) {
+	blockHistory := f.blockHistory.Load()
+	if blockHistory == 0 || best <= blockHistory {
+		return
+	}
+
+	expectTail := best - blockHistory
+	ancientHead, err := f.Ancients()
+	if err != nil {
+		log.Warn("PruneHistoryBlock query Ancients error", "best", best, "err", err)
+		return
+	}
+	if expectTail > ancientHead {
+		expectTail = ancientHead
+	}
+	old, err := f.TruncateTail(expectTail)
+	if err != nil {
+		log.Warn("PruneHistoryBlock TruncateTail error", "best", best,
+			"expectTail", expectTail, "blockHistory", blockHistory, "err", err)
+		return
+	}
+	log.Debug("Prune block history successful", "oldtail", old, "tail", expectTail, "best", best, "history", blockHistory)
 }

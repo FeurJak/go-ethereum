@@ -230,6 +230,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 			SnapshotLimit:    config.SnapshotCache,
 			Preimages:        config.Preimages,
 			StateHistory:     config.StateHistory,
+			BlockHistory:     config.BlockHistory,
 			StateScheme:      scheme,
 			ChainHistoryMode: config.HistoryMode,
 			TxLookupLimit:    int64(min(config.TransactionHistory, math.MaxInt64)),
@@ -483,7 +484,7 @@ func (s *Ethereum) updateFilterMapsHeads() {
 		if head == nil || newHead.Hash() != head.Hash() {
 			head = newHead
 			chainView := s.newChainView(head)
-			historyCutoff, _ := s.blockchain.HistoryPruningCutoff()
+			historyCutoff := s.blockchain.HistoryBlockTail()
 			var finalBlock uint64
 			if fb := s.blockchain.CurrentFinalBlock(); fb != nil {
 				finalBlock = fb.Number.Uint64()

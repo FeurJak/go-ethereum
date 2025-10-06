@@ -60,7 +60,7 @@ type txIndexer struct {
 
 	// cutoff denotes the block number before which the chain segment should
 	// be pruned and not available locally.
-	cutoff uint64
+	cutoff atomic.Uint64
 	db     ethdb.Database
 	term   chan chan struct{}
 	closed chan struct{}
@@ -68,10 +68,9 @@ type txIndexer struct {
 
 // newTxIndexer initializes the transaction indexer.
 func newTxIndexer(limit uint64, chain *BlockChain) *txIndexer {
-	cutoff, _ := chain.HistoryPruningCutoff()
+	cutoff := chain.HistoryBlockTail()
 	indexer := &txIndexer{
 		limit:  limit,
-		cutoff: cutoff,
 		db:     chain.db,
 		term:   make(chan chan struct{}),
 		closed: make(chan struct{}),
@@ -83,10 +82,10 @@ func newTxIndexer(limit uint64, chain *BlockChain) *txIndexer {
 
 	var msg string
 	if limit == 0 {
-		if indexer.cutoff == 0 {
+		if cutoff == 0 {
 			msg = "entire chain"
 		} else {
-			msg = fmt.Sprintf("blocks since #%d", indexer.cutoff)
+			msg = fmt.Sprintf("blocks since #%d", cutoff)
 		}
 	} else {
 		msg = fmt.Sprintf("last %d blocks", limit)
@@ -107,7 +106,8 @@ func (indexer *txIndexer) run(head uint64, stop chan struct{}, done chan struct{
 
 	// Short circuit if the chain is either empty, or entirely below the
 	// cutoff point.
-	if head == 0 || head < indexer.cutoff {
+	cutoff := indexer.cutoff.Load()
+	if head == 0 || head < cutoff {
 		return
 	}
 	// The tail flag is not existent, it means the node is just initialized
@@ -121,7 +121,7 @@ func (indexer *txIndexer) run(head uint64, stop chan struct{}, done chan struct{
 		if indexer.limit != 0 && head >= indexer.limit {
 			from = head - indexer.limit + 1
 		}
-		from = max(from, indexer.cutoff)
+		from = max(from, cutoff)
 		rawdb.IndexTransactions(indexer.db, from, head+1, stop, true)
 		return
 	}
@@ -129,7 +129,7 @@ func (indexer *txIndexer) run(head uint64, stop chan struct{}, done chan struct{
 	// present), while the whole chain are requested for indexing.
 	if indexer.limit == 0 || head < indexer.limit {
 		if *tail > 0 {
-			from := max(uint64(0), indexer.cutoff)
+			from := max(uint64(0), cutoff)
 			rawdb.IndexTransactions(indexer.db, from, *tail, stop, true)
 		}
 		return
@@ -137,7 +137,7 @@ func (indexer *txIndexer) run(head uint64, stop chan struct{}, done chan struct{
 	// The tail flag is existent, adjust the index range according to configured
 	// limit and the latest chain head.
 	from := head - indexer.limit + 1
-	from = max(from, indexer.cutoff)
+	from = max(from, cutoff)
 	if from < *tail {
 		// Reindex a part of missing indices and rewind index tail to HEAD-limit
 		rawdb.IndexTransactions(indexer.db, from, *tail, stop, true)
@@ -177,8 +177,8 @@ func (indexer *txIndexer) repair(head uint64) {
 	// removing the tail of transaction indexing and purges the
 	// transaction indexes. **It's not a common case, as the cutoff
 	// is usually defined below the chain head**.
-	if head < indexer.cutoff {
-		// A crash may occur between the two delete operations,
+	cutoff := indexer.cutoff.Load()
+	if head < cutoff { // A crash may occur between the two delete operations,
 		// potentially leaving dangling indexes in the database.
 		// However, this is considered acceptable.
 		//
@@ -190,24 +190,24 @@ func (indexer *txIndexer) repair(head uint64) {
 		indexer.tail.Store(nil)
 		rawdb.DeleteTxIndexTail(indexer.db)
 		rawdb.DeleteAllTxLookupEntries(indexer.db, nil)
-		log.Warn("Purge transaction indexes", "head", head, "cutoff", indexer.cutoff)
+		log.Warn("Purge transaction indexes", "head", head, "cutoff", cutoff)
 		return
 	}
 
 	// The chain head is above the cutoff while the tail is below the
 	// cutoff. Shift the tail to the cutoff point and remove the indexes
 	// below.
-	if *tail < indexer.cutoff {
+	if *tail < cutoff {
 		// A crash may occur between the two delete operations,
 		// potentially leaving dangling indexes in the database.
 		// However, this is considered acceptable.
-		indexer.tail.Store(&indexer.cutoff)
-		rawdb.WriteTxIndexTail(indexer.db, indexer.cutoff)
+		indexer.tail.Store(&cutoff)
+		rawdb.WriteTxIndexTail(indexer.db, cutoff)
 		rawdb.DeleteAllTxLookupEntries(indexer.db, func(txhash common.Hash, blob []byte) bool {
 			n := rawdb.DecodeTxLookupEntry(blob, indexer.db)
-			return n != nil && *n < indexer.cutoff
+			return n != nil && *n < cutoff
 		})
-		log.Warn("Purge transaction indexes below cutoff", "tail", *tail, "cutoff", indexer.cutoff)
+		log.Warn("Purge transaction indexes below cutoff", "tail", *tail, "cutoff", cutoff)
 	}
 }
 
@@ -252,6 +252,7 @@ func (indexer *txIndexer) loop(chain *BlockChain) {
 	for {
 		select {
 		case h := <-headCh:
+			indexer.cutoff.Store(chain.HistoryBlockTail())
 			indexer.head.Store(h.Header.Number.Uint64())
 			if done == nil {
 				stop = make(chan struct{})
@@ -280,9 +281,11 @@ func (indexer *txIndexer) loop(chain *BlockChain) {
 
 // report returns the tx indexing progress.
 func (indexer *txIndexer) report(head uint64, tail *uint64) TxIndexProgress {
+	cutoff := indexer.cutoff.Load()
+
 	// Special case if the head is even below the cutoff,
 	// nothing to index.
-	if head < indexer.cutoff {
+	if head < cutoff {
 		return TxIndexProgress{
 			Indexed:   0,
 			Remaining: 0,
@@ -293,7 +296,7 @@ func (indexer *txIndexer) report(head uint64, tail *uint64) TxIndexProgress {
 	if indexer.limit == 0 || total > head {
 		total = head + 1 // genesis included
 	}
-	length := head - indexer.cutoff + 1 // all available chain for indexing
+	length := head - cutoff + 1 // all available chain for indexing
 	if total > length {
 		total = length
 	}

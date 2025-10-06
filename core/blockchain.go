@@ -173,6 +173,8 @@ type BlockChainConfig struct {
 	StateScheme  string // Scheme used to store ethereum states and merkle tree nodes on top
 	ArchiveMode  bool   // Whether to enable the archive mode
 
+	BlockHistory uint64
+
 	// State snapshot related options
 	SnapshotLimit   int  // Memory allowance (MB) to use for caching snapshot entries in memory
 	SnapshotNoBuild bool // Whether the background generation is allowed
@@ -701,7 +703,7 @@ func (bc *BlockChain) initializeHistoryPruning(latest uint64) error {
 		if predefinedPoint == nil {
 			log.Error("Chain history pruning is not supported for this network", "genesis", bc.genesisBlock.Hash())
 			return errors.New("history pruning requested for unknown network")
-		} else if freezerTail > 0 && freezerTail != predefinedPoint.BlockNumber {
+		} else if freezerTail > 0 && bc.cfg.BlockHistory == 0 && freezerTail != predefinedPoint.BlockNumber {
 			log.Error("Chain history database is pruned to unknown block", "tail", freezerTail)
 			return errors.New("unexpected database tail")
 		}
@@ -2787,4 +2789,24 @@ func (bc *BlockChain) SetTrieFlushInterval(interval time.Duration) {
 // GetTrieFlushInterval gets the in-memory tries flushAlloc interval
 func (bc *BlockChain) GetTrieFlushInterval() time.Duration {
 	return time.Duration(bc.flushInterval.Load())
+}
+
+func (bc *BlockChain) HistoryBlockTail() uint64 {
+	cutoff, _ := bc.HistoryPruningCutoff()
+	if bc.cfg.BlockHistory == 0 {
+		tail, _ := bc.db.Tail()
+		return max(cutoff, tail)
+	}
+
+	// We calculate block history from the latest block (instead of finalized block)
+	// even though pruning is based on finalized block. This is done because pruning
+	// runs in a separate goroutine and we cannot guarantee that the result will be
+	// valid at the time of the block number request. By returning a later block,
+	// we ensure its existence and avoid edge cases.
+	if latest := bc.CurrentBlock(); latest != nil && latest.Number.Uint64() > bc.cfg.BlockHistory {
+		return max(latest.Number.Uint64()-bc.cfg.BlockHistory, cutoff)
+	}
+
+	tail, _ := bc.db.Tail()
+	return max(cutoff, tail)
 }

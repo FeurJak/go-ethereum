@@ -246,7 +246,7 @@ func TestTxIndexerRepair(t *testing.T) {
 		}
 		indexer.run(chainHead, make(chan struct{}), make(chan struct{}))
 
-		indexer.cutoff = c.cutoff
+		indexer.cutoff.Store(c.cutoff)
 		indexer.repair(c.head)
 
 		if c.expTail == nil {
@@ -432,9 +432,8 @@ func TestTxIndexerReport(t *testing.T) {
 
 		// Index the initial blocks from ancient store
 		indexer := &txIndexer{
-			limit:  c.limit,
-			cutoff: c.cutoff,
-			db:     db,
+			limit: c.limit,
+			db:    db,
 		}
 		p := indexer.report(c.head, c.tail)
 		if p.Indexed != c.expIndexed {

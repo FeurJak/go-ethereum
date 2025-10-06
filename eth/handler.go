@@ -653,7 +653,7 @@ func (h *handler) broadcastBlockRange(state *blockRangeState) {
 
 // update assigns the values of the next block range update from the chain.
 func (st *blockRangeState) update(chain *core.BlockChain, latest *types.Header) {
-	earliest, _ := chain.HistoryPruningCutoff()
+	earliest := chain.HistoryBlockTail()
 	st.next.Store(&eth.BlockRangeUpdatePacket{
 		EarliestBlock:   min(latest.Number.Uint64(), earliest),
 		LatestBlock:     latest.Number.Uint64(),

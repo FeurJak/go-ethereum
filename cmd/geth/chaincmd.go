@@ -657,8 +657,13 @@ func hashish(x string) bool {
 }
 
 func pruneHistory(ctx *cli.Context) error {
-	stack, _ := makeConfigNode(ctx)
+	stack, cfg := makeConfigNode(ctx)
 	defer stack.Close()
+
+	if err := rawdb.SetPrunableTableConfigs(cfg.Eth.PruneTables...); err != nil {
+		return err
+	}
+	history.SetPrunePoint(cfg.Eth.CutoffGenesis, cfg.Eth.CutoffBlock, cfg.Eth.CutoffHash)
 
 	// Open the chain database
 	chain, chaindb := utils.MakeChain(ctx, stack, false)

@@ -282,6 +282,32 @@ var (
 		Value:    ethconfig.Defaults.TransactionHistory,
 		Category: flags.StateCategory,
 	}
+	CutoffGenesisFlag = &cli.StringFlag{
+		Name:     "history.cutoff-genesis",
+		Usage:    "Genesis block hash used to define the custom history prune point",
+		Category: flags.StateCategory,
+	}
+	CutoffBlockFlag = &cli.Uint64Flag{
+		Name:     "history.cutoff-block",
+		Usage:    "Block number up to which history can be pruned (used with genesis and hash)",
+		Category: flags.StateCategory,
+	}
+	CutoffHashFlag = &cli.StringFlag{
+		Name:     "history.cutoff-hash",
+		Usage:    "Block hash at the cutoff block, ensuring consistency of the prune point",
+		Category: flags.StateCategory,
+	}
+	PruneTablesFlag = &cli.StringSliceFlag{
+		Name:     "history.prune-tables",
+		Usage:    "List of database freezer tables to mark as prunable (e.g. headers, hashes)",
+		Category: flags.StateCategory,
+	}
+	BlockHistoryFlag = &cli.Uint64Flag{
+		Name:     "history.blocks",
+		Usage:    "Number of recent blocks to maintain in DB (default = 0, 0 = entire chain). Pruning is not involving TxIndex/bloomIndex.",
+		Value:    ethconfig.Defaults.BlockHistory,
+		Category: flags.BlockHistoryCategory,
+	}
 	ChainHistoryFlag = &cli.StringFlag{
 		Name:     "history.chain",
 		Usage:    `Blockchain history retention ("all" or "postmerge")`,
@@ -987,6 +1013,7 @@ var (
 		DBEngineFlag,
 		StateSchemeFlag,
 		HttpHeaderFlag,
+		CutoffGenesisFlag, CutoffBlockFlag, CutoffHashFlag, PruneTablesFlag, BlockHistoryFlag, ChainHistoryFlag,
 	}
 )
 
@@ -1656,11 +1683,38 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *ethconfig.Config) {
 		log.Warn("The flag --txlookuplimit is deprecated and will be removed, please use --history.transactions")
 		cfg.TransactionHistory = ctx.Uint64(TxLookupLimitFlag.Name)
 	}
+	if ctx.IsSet(CutoffGenesisFlag.Name) {
+		cfg.CutoffGenesis = common.HexToHash(ctx.String(CutoffGenesisFlag.Name))
+	}
+	if ctx.IsSet(CutoffBlockFlag.Name) {
+		cfg.CutoffBlock = ctx.Uint64(CutoffBlockFlag.Name)
+	}
+	if ctx.IsSet(CutoffHashFlag.Name) {
+		cfg.CutoffHash = common.HexToHash(ctx.String(CutoffHashFlag.Name))
+	}
+	if ctx.IsSet(PruneTablesFlag.Name) {
+		cfg.PruneTables = ctx.StringSlice(PruneTablesFlag.Name)
+	}
+	if ctx.IsSet(BlockHistoryFlag.Name) {
+		cfg.BlockHistory = ctx.Uint64(BlockHistoryFlag.Name)
+		if cfg.BlockHistory != 0 && cfg.BlockHistory < params.FullImmutabilityThreshold {
+			log.Warn("The number of block history is too small, that it will force to", "fullImmutabilityThreshold", params.FullImmutabilityThreshold)
+			cfg.BlockHistory = params.FullImmutabilityThreshold
+		}
+	}
+	if cfg.BlockHistory != 0 && cfg.TransactionHistory > cfg.BlockHistory {
+		log.Warn("Transaction history is capped by block history", "provided", cfg.TransactionHistory, "updated", cfg.BlockHistory)
+		cfg.TransactionHistory = cfg.BlockHistory
+	}
 	if ctx.String(GCModeFlag.Name) == "archive" {
 		if cfg.TransactionHistory != 0 {
 			cfg.TransactionHistory = 0
 			log.Warn("Disabled transaction unindexing for archive node")
 		}
+	}
+	if cfg.BlockHistory != 0 {
+		cfg.BlockHistory = 0
+		log.Warn("Disabled partial block reserve for archive node")
 	}
 	if ctx.IsSet(LogHistoryFlag.Name) {
 		cfg.LogHistory = ctx.Uint64(LogHistoryFlag.Name)
@@ -2200,6 +2254,7 @@ func MakeChain(ctx *cli.Context, stack *node.Node, readonly bool) (*core.BlockCh
 		Preimages:      ctx.Bool(CachePreimagesFlag.Name),
 		StateScheme:    scheme,
 		StateHistory:   ctx.Uint64(StateHistoryFlag.Name),
+		BlockHistory:   ctx.Uint64(BlockHistoryFlag.Name),
 		// Disable transaction indexing/unindexing.
 		TxLookupLimit: -1,
 
@@ -2208,6 +2263,12 @@ func MakeChain(ctx *cli.Context, stack *node.Node, readonly bool) (*core.BlockCh
 		// - DATADIR/triedb/merkle.journal
 		// - DATADIR/triedb/verkle.journal
 		TrieJournalDirectory: stack.ResolvePath("triedb"),
+	}
+	if ctx.IsSet(ChainHistoryFlag.Name) {
+		value := ctx.String(ChainHistoryFlag.Name)
+		if err = options.ChainHistoryMode.UnmarshalText([]byte(value)); err != nil {
+			Fatalf("--%s: %v", ChainHistoryFlag.Name, err)
+		}
 	}
 	if options.ArchiveMode && !options.Preimages {
 		options.Preimages = true
