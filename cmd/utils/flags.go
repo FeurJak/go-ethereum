@@ -321,7 +321,7 @@ var (
 		Name:     "history.blocks",
 		Usage:    "Number of recent blocks to maintain in DB (default = 0, 0 = entire chain). Pruning is not involving TxIndex/bloomIndex.",
 		Value:    ethconfig.Defaults.BlockHistory,
-		Category: flags.BlockHistoryCategory,
+		Category: flags.StateCategory,
 	}
 	ChainHistoryFlag = &cli.StringFlag{
 		Name:     "history.chain",
@@ -1044,7 +1044,7 @@ var (
 		DBEngineFlag,
 		StateSchemeFlag,
 		HttpHeaderFlag,
-		CutoffGenesisFlag, CutoffBlockFlag, CutoffHashFlag, PruneTablesFlag, BlockHistoryFlag, ChainHistoryFlag,
+		CutoffGenesisFlag, CutoffBlockFlag, CutoffHashFlag, PruneTablesFlag, BlockHistoryFlag,
 	}
 )
 
