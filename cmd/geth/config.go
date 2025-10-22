@@ -37,6 +37,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/history"
+	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/catalyst"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
@@ -240,7 +241,9 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 		v := ctx.Uint64(utils.OverrideVerkle.Name)
 		cfg.Eth.OverrideVerkle = &v
 	}
-
+	if err := rawdb.SetPrunableTableConfigs(cfg.Eth.PruneTables...); err != nil {
+		utils.Fatalf("failed to set prunable tables: %v", err)
+	}
 	history.SetPrunePoint(cfg.Eth.CutoffGenesis, cfg.Eth.CutoffBlock, cfg.Eth.CutoffHash)
 
 	// Start metrics export if enabled
